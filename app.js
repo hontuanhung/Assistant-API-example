@@ -1,6 +1,7 @@
 // import the required dependencies
 require("dotenv").config();
 const OpenAI = require("openai");
+import { getAlertVolume } from "./orders/orders.js";
 
 const readline = require("readline").createInterface({
   input: process.stdin,
@@ -8,7 +9,7 @@ const readline = require("readline").createInterface({
 });
 
 // Create a OpenAI connection
-const secretKey = "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";
+const secretKey = "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";
 const openai = new OpenAI({
   apiKey: secretKey,
 });
@@ -60,8 +61,6 @@ async function main() {
     //   model: "gpt-3.5-turbo-1106",
     // });
 
-    
-
     // Log the first greeting
     console.log(
       "\nHello there, I'm your personal math tutor. Ask some complicated questions.\n"
@@ -80,11 +79,10 @@ async function main() {
         role: "user",
         content: userQuestion,
       });
-      
 
       // Use runs to wait for the assistant response and then retrieve it
       const run = await openai.beta.threads.runs.create(thread.id, {
-        assistant_id: 'asst_JMQjV8YIsECpsYl8AUIr0LJq',
+        assistant_id: "asst_JMQjV8YIsECpsYl8AUIr0LJq",
       });
 
       let runStatus = await openai.beta.threads.runs.retrieve(
@@ -94,6 +92,28 @@ async function main() {
 
       // Polling mechanism to see if runStatus is completed
       // This should be made more robust.
+      if (runStatus.status === "requires_action") {
+        const agrs =
+          runStatus.required_action.submit_tool_outputs.tool_calls[0].function
+            .arguments;
+        const stringOfVolume = getAlertVolume(
+          agrs.volume,
+          agrs.date,
+          agrs.limit
+        );
+        for (const ms of stringOfVolume) {
+          await openai.beta.threads.messages.create(thread.id, {
+            role: "user",
+            content: {
+              tool_call_id: toolCall.id,
+              role: "tool",
+              name: functionName,
+              content: functionResponse,
+            },
+          });
+        }
+      }
+
       while (runStatus.status !== "completed") {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);

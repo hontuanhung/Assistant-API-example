@@ -36,9 +36,9 @@ mongoose
 export async function getAlertVolume(volume, date, limit) {
   try {
     const currentTime = new Date().getTime();
-
+    date = 1 * 24 * 60 * 60 * 1000;
     const dateRange = {
-      $gte: new Date(date),
+      $gte: new Date(Date.now() - date),
       $lt: new Date(currentTime),
     };
     const sizeCondition = { $gte: volume };
