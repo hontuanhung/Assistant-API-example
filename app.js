@@ -1,13 +1,14 @@
 // import the required dependencies
 require("dotenv").config();
 const OpenAI = require("openai");
+
 const readline = require("readline").createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
 // Create a OpenAI connection
-const secretKey = '<Your API key>';
+const secretKey = "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";
 const openai = new OpenAI({
   apiKey: secretKey,
 });
@@ -22,13 +23,44 @@ async function askQuestion(question) {
 
 async function main() {
   try {
-    const assistant = await openai.beta.assistants.create({
-      name: "Math Tutor",
-      instructions:
-        "You are a personal math tutor. Write and run code to answer math questions.",
-      tools: [{ type: "code_interpreter" }],
-      model: "gpt-4-1106-preview",
-    });
+    // const assistant = await openai.beta.assistants.update({
+    //   name: "Copin Analyzer",
+    //   instructions:
+    //     "My website is Copin, a platform designed for analyzing and copying on-chain traders. You are an intelligent bot dedicated to answering user questions related to my website. If users inquire about topics unrelated to Copin, you will inform them that you are only here to respond to questions about Copin. You automatically utilize the files & functions I've uploaded and search for information to provide accurate and relevant responses. Answers should not contain details related to your operational processes and files.",
+    //   tools: [
+    //     { type: "code_interpreter" },
+    //     {
+    //       type: "function",
+    //         function: {
+    //           name: "get alert",
+    //           description:
+    //             "Get the array of string with the given volume, the string with a structure that is nearly like this.: \\n 🚨 $1,002,990.14 Opened LONG #BNB at $263.11 on #KWENTA\n\n\n [website]",
+    //           parameters: {
+    //             type: "object",
+    //             properties: {
+    //               volume: {
+    //                 type: "number",
+    //                 description: "The amount of volume",
+    //               },
+    //               date: {
+    //                 type: "number",
+    //                 description:
+    //                   "The timestamp of the given date is used for querying up to the current date.",
+    //               },
+    //               limit: {
+    //                 type: "number",
+    //                 description: "The limit of orders returned upon request.",
+    //               },
+    //             },
+    //             required: ["volume"],
+    //           },
+    //         },
+    //     },
+    //   ],
+    //   model: "gpt-3.5-turbo-1106",
+    // });
+
+    
 
     // Log the first greeting
     console.log(
@@ -48,10 +80,11 @@ async function main() {
         role: "user",
         content: userQuestion,
       });
+      
 
       // Use runs to wait for the assistant response and then retrieve it
       const run = await openai.beta.threads.runs.create(thread.id, {
-        assistant_id: assistant.id,
+        assistant_id: 'asst_JMQjV8YIsECpsYl8AUIr0LJq',
       });
 
       let runStatus = await openai.beta.threads.runs.retrieve(
@@ -83,9 +116,9 @@ async function main() {
 
       // Then ask if the user wants to ask another question and update keepAsking state
       const continueAsking = await askQuestion(
-        "Do you want to ask another question? (yes/no) "
+        "Do you want to ask another question? (y/n) "
       );
-      keepAsking = continueAsking.toLowerCase() === "yes";
+      keepAsking = continueAsking.toLowerCase() === "y";
 
       // If the keepAsking state is falsy show an ending message
       if (!keepAsking) {

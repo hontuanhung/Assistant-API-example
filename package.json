@@ -1,0 +1,20 @@
+{
+  "name": "assistant-api-example",
+  "version": "1.0.0",
+  "description": "",
+  "main": "assistantAPI.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Hung",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "fs": "^0.0.1-security",
+    "mongoose": "^8.0.1",
+    "openai": "^4.19.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.2"
+  }
+}
