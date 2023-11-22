@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const orderSchema = new mongoose.Schema({
   account: {
-    type: { type: String },
+    type: String,
   },
   txHash: { type: String },
 
@@ -51,6 +51,6 @@ const orderSchema = new mongoose.Schema({
   createdAt: Date,
 });
 
-const order = mongoose.model('kwenta_order', orderSchema);
+const order = mongoose.model("kwenta_order", orderSchema);
 
 module.exports = order;

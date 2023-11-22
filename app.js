@@ -1,6 +1,7 @@
 // import the required dependencies
 require("dotenv").config();
 const OpenAI = require("openai");
+// import OpenAI from 'openai'
 const getAlert = require("./orders/orders");
 
 const readline = require("readline").createInterface({
@@ -9,7 +10,7 @@ const readline = require("readline").createInterface({
 });
 
 // Create a OpenAI connection
-const secretKey = "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";
+const secretKey = "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";
 const openai = new OpenAI({
   apiKey: secretKey,
 });
@@ -92,11 +93,12 @@ async function main() {
 
       // Polling mechanism to see if runStatus is completed
       // This should be made more robust.
-      while (runStatus.status === "in_progress") {
-        runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
-      }
+      
 
       while (runStatus.status !== "completed") {
+        while (runStatus.status === "in_progress") {
+          runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
+        }
         console.log(runStatus.status);
         if (runStatus.status === "failed") {
           break;
@@ -106,27 +108,38 @@ async function main() {
             runStatus.required_action.submit_tool_outputs.tool_calls[0].function
               .arguments
           );
-          const stringOfVolume = await getAlert(agrs.volume, agrs.date, agrs.limit);
+          console.log(agrs);
+          const stringOfVolume = await getAlert(
+            agrs.volume,
+            agrs.date,
+            agrs.limit
+          );
           if (!stringOfVolume.length) {
             await openai.beta.threads.messages.create(thread.id, {
               role: "user",
               content: "response: 'There is no order has found'",
             });
-            break
+            break;
           }
+          let message = ''
           for (const ms of stringOfVolume) {
-            await openai.beta.threads.runs.submitToolOutputs(
-              thread.id,
-              run.id,
-              {
-                role: "user",
-                content: {
-                  tool_call_id: toolCall.id,
-                  output: ms,
-                },
-              }
-            );
+            message += `${ms}\n\n`
           }
+          await openai.beta.threads.runs.submitToolOutputs(
+            thread.id,
+            run.id,
+            {
+              tool_outputs: [
+                {
+                  tool_call_id:
+                    runStatus.required_action.submit_tool_outputs
+                      .tool_calls[0].id,
+                  output: message || 'There is no order'
+                },
+              ],
+            }
+          );
+          runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
         }
       }
 

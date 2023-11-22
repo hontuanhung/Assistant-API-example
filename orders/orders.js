@@ -5,6 +5,7 @@ const positionDB = require("./posisionSchema");
 const TrackerOrderEntity = require("./trackerOrderEntity");
 const SCRIPT_KEY = require("./script-key");
 const BOT_SCRIPT = require("./bot-script");
+const BINGX_TOKEN = require("./token");
 
 process.on("uncaughtException", (err) => {
   console.log("UNHANDLER REJECTIONN! Shutting down...");
@@ -31,7 +32,7 @@ mongoose
     console.log(err);
   });
 
-async function getAlertVolume(volume = 1000000, date = 2, limit = 6) {
+module.exports = async function getAlertVolume({volume, compareOperator}, date, limit) {
   try {
     const currentTime = new Date().getTime();
     date = 1 * 24 * 60 * 60 * 1000;
@@ -39,7 +40,7 @@ async function getAlertVolume(volume = 1000000, date = 2, limit = 6) {
       $gte: new Date(Date.now() - date),
       $lt: new Date(currentTime),
     };
-    const sizeCondition = { $gte: volume };
+    const sizeCondition = { [compareOperator]: volume };
 
     const kwentaOrders = await orderDB
       .find({
@@ -71,27 +72,24 @@ async function processKwentaOrder(orders) {
         case "OPEN":
         case "INCREASE":
         case "DECREASE":
-          processAlert(
-            new TrackerOrderEntity({
-              id: order.id,
-              type: order.type,
-              account: order.account,
-              isLong: order.isLong,
-              size: order.sizeDelta,
-              leverage: order.leverage,
-              indexToken: order.indexToken,
-              price: order.priceNumber,
-              key: (
-                await positionDB.findOne({
-                  orderIds: order.id,
-                  status: POSITION_STATUS.OPEN,
-                })
-              ).key,
-              blockNumber: order.blockNumber,
-            }),
-            "KWENTA",
-            false
-          );
+          const task = new TrackerOrderEntity({
+            id: order.id,
+            type: order.type,
+            account: order.account,
+            isLong: order.isLong,
+            size: order.sizeDelta,
+            leverage: order.leverage,
+            indexToken: order.indexToken,
+            price: order.priceNumber,
+            key: (
+              await positionDB.findOne({
+                orderIds: order.id,
+                status: "OPEN",
+              })
+            ).key,
+            blockNumber: order.blockNumber,
+          });
+          alerts.push(await processAlert(task, "KWENTA", false));
 
           break;
         case "LIQUIDATE":
@@ -143,7 +141,7 @@ function processAlert(order, protocol, isPosition) {
       isPosition ? positionParams : orderParams
     );
     const url = `https://devvv.copin.io/${protocol}/position?${params.toString()}&utm_source=Twitter&utm_medium=direct&utm_campaign=Whales`;
-
+    const key = SCRIPT_KEY.ORDER_TYPE;
     let messageData = [
       [
         SCRIPT_KEY.ORDER_TYPE,
@@ -153,17 +151,20 @@ function processAlert(order, protocol, isPosition) {
       ],
       [SCRIPT_KEY.BUY_TYPE, order.isLong ? "LONG" : "SHORT"],
       [SCRIPT_KEY.INDEX_TOKEN, BINGX_TOKEN[order.token]],
-      [SCRIPT_KEY.VOLUME, TextUtil.convertNumToCurrency(order.volume)],
+      [
+        SCRIPT_KEY.VOLUME,
+        order.volume.toLocaleString("en-US", {
+          style: "currency",
+          currency: "USD",
+        }) || 0,
+      ],
       [SCRIPT_KEY.ADDRESS, url],
       [SCRIPT_KEY.ALERTEMOS, generateAlertEmos(order.volume)],
       // [SCRIPT_KEY.SHORT_ADDRESS, order.address.substring(0, 8)],
       [SCRIPT_KEY.AVERAGE_PRICE, order.price],
       [SCRIPT_KEY.PROTOCOL, protocol],
     ];
-    if (
-      order.type === ORDER_TYPE.CLOSE ||
-      order.type === ORDER_TYPE.LIQUIDATE
-    ) {
+    if (order.type === "CLOSE" || order.type === "LIQUIDATE") {
       messageData = [
         ...messageData,
         [
@@ -176,11 +177,11 @@ function processAlert(order, protocol, isPosition) {
     }
 
     const script =
-      order.type === ORDER_TYPE.CLOSE || order.type === ORDER_TYPE.LIQUIDATE
+      order.type === "CLOSE" || order.type === "LIQUIDATE"
         ? BOT_SCRIPT.WHALE_ORDER_CLOSE_ALERT
         : BOT_SCRIPT.WHALE_ALERT;
 
-    return fillText(script, new Map() < string, string > messageData);
+    return fillText(script, new Map(messageData));
   } catch (error) {
     SentryService.captureException(`Error when process alert: ${error.stack}`);
   }
@@ -199,6 +200,7 @@ function generateAlertEmos(volume) {
   const alertEmo = "🚨";
 
   let repeatTimes = 0;
+  const whaleAlertAmounts = [1000000, 4000000, 7000000, 10000000, 1300000];
   for (const amount of whaleAlertAmounts) {
     if (volume >= amount) {
       repeatTimes++;
@@ -219,4 +221,3 @@ function generateDotEmos(roi) {
   return roiEmo.repeat(repeatTimes);
 }
 
-getAlertVolume();
