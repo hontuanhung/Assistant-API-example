@@ -1,4 +1,4 @@
-export class TrackerOrderEntity {
+module.exports = class TrackerOrderEntity {
   constructor(partial) {
       if (partial) {
           this.id = partial.id;

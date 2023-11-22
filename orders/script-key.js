@@ -1,4 +1,4 @@
-export var SCRIPT_KEY;
+var SCRIPT_KEY;
 (function (SCRIPT_KEY) {
     SCRIPT_KEY["ORDER_TYPE"] = "[order-type]";
     SCRIPT_KEY["BUY_TYPE"] = "[buy-type]";
@@ -11,3 +11,4 @@ export var SCRIPT_KEY;
     SCRIPT_KEY["CONTENT"] = "[content]";
     SCRIPT_KEY["ALERTEMOS"] = "[alert-emos]";
 })(SCRIPT_KEY || (SCRIPT_KEY = {}));
+module.exports = SCRIPT_KEY

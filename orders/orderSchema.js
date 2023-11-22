@@ -51,6 +51,6 @@ const orderSchema = new mongoose.Schema({
   createdAt: Date,
 });
 
-const order = mongoose.model('order', orderSchema);
+const order = mongoose.model('kwenta_order', orderSchema);
 
 module.exports = order;

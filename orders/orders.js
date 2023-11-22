@@ -2,9 +2,9 @@ const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const orderDB = require("./orderSchema");
 const positionDB = require("./posisionSchema");
-import { TrackerOrderEntity } from "./trackerOrderEntity";
-import { SCRIPT_KEY } from "./script-key";
-import { BOT_SCRIPT } from "./bot-script";
+const TrackerOrderEntity = require("./trackerOrderEntity");
+const SCRIPT_KEY = require("./script-key");
+const BOT_SCRIPT = require("./bot-script");
 
 process.on("uncaughtException", (err) => {
   console.log("UNHANDLER REJECTIONN! Shutting down...");
@@ -21,8 +21,6 @@ const DB =
 mongoose
   .connect(DB, {
     useNewUrlParser: true,
-    useCreateIndex: true,
-    useFindAndModify: false,
     useUnifiedTopology: true,
   })
   .then((con) => {
@@ -33,7 +31,7 @@ mongoose
     console.log(err);
   });
 
-export async function getAlertVolume(volume, date, limit) {
+async function getAlertVolume(volume = 1000000, date = 2, limit = 6) {
   try {
     const currentTime = new Date().getTime();
     date = 1 * 24 * 60 * 60 * 1000;
@@ -59,9 +57,9 @@ export async function getAlertVolume(volume, date, limit) {
       })
       .sort({ createdAt: -1 })
       .limit(limit || 1);
-    processKwentaOrder(kwentaOrders);
+    return await processKwentaOrder(kwentaOrders);
   } catch (e) {
-    SentryService.captureException(`Error when process order: ${e.stack}`);
+    console.log(e);
   }
 }
 
@@ -73,29 +71,28 @@ async function processKwentaOrder(orders) {
         case "OPEN":
         case "INCREASE":
         case "DECREASE":
-          alerts.push(
-            await processAlert(
-              new TrackerOrderEntity({
-                id: order.id,
-                type: order.type,
-                account: order.account,
-                isLong: order.isLong,
-                size: order.sizeDelta,
-                leverage: order.leverage,
-                indexToken: order.indexToken,
-                price: order.priceNumber,
-                key: (
-                  await positionDB.findOne({
-                    orderIds: order.id,
-                    status: POSITION_STATUS.OPEN,
-                  })
-                ).key,
-                blockNumber: order.blockNumber,
-              }),
-              "KWENTA",
-              false
-            )
+          processAlert(
+            new TrackerOrderEntity({
+              id: order.id,
+              type: order.type,
+              account: order.account,
+              isLong: order.isLong,
+              size: order.sizeDelta,
+              leverage: order.leverage,
+              indexToken: order.indexToken,
+              price: order.priceNumber,
+              key: (
+                await positionDB.findOne({
+                  orderIds: order.id,
+                  status: POSITION_STATUS.OPEN,
+                })
+              ).key,
+              blockNumber: order.blockNumber,
+            }),
+            "KWENTA",
+            false
           );
+
           break;
         case "LIQUIDATE":
           order.sizeDelta = order.sizeNumber;
@@ -127,13 +124,11 @@ async function processKwentaOrder(orders) {
     }
     return alerts;
   } catch (error) {
-    SentryService.captureException(
-      `Error when process kwenta order: ${error.stack}`
-    );
+    console.log(error);
   }
 }
 
-async function processAlert(order, protocol, isPosition) {
+function processAlert(order, protocol, isPosition) {
   try {
     const orderParams = {
       account: order.account,
@@ -160,7 +155,7 @@ async function processAlert(order, protocol, isPosition) {
       [SCRIPT_KEY.INDEX_TOKEN, BINGX_TOKEN[order.token]],
       [SCRIPT_KEY.VOLUME, TextUtil.convertNumToCurrency(order.volume)],
       [SCRIPT_KEY.ADDRESS, url],
-      [SCRIPT_KEY.ALERTEMOS, await generateAlertEmos(order.volume)],
+      [SCRIPT_KEY.ALERTEMOS, generateAlertEmos(order.volume)],
       // [SCRIPT_KEY.SHORT_ADDRESS, order.address.substring(0, 8)],
       [SCRIPT_KEY.AVERAGE_PRICE, order.price],
       [SCRIPT_KEY.PROTOCOL, protocol],
@@ -173,7 +168,7 @@ async function processAlert(order, protocol, isPosition) {
         ...messageData,
         [
           SCRIPT_KEY.CONTENT,
-          `${await generateDotEmos(order.roi)} PnL: ${order.pnl} | ROI: ${
+          `${generateDotEmos(order.roi)} PnL: ${order.pnl} | ROI: ${
             order.roi
           }%`,
         ],
@@ -200,7 +195,7 @@ function fillText(baseStr, fillMap) {
   return resultStr;
 }
 
-async function generateAlertEmos(volume) {
+function generateAlertEmos(volume) {
   const alertEmo = "🚨";
 
   let repeatTimes = 0;
@@ -215,7 +210,7 @@ async function generateAlertEmos(volume) {
     : alertEmo.repeat(repeatTimes);
 }
 
-async function generateDotEmos(roi) {
+function generateDotEmos(roi) {
   const roiEmo = roi >= 0 ? "🟢" : "🔴";
 
   const step = 20;
@@ -223,3 +218,5 @@ async function generateDotEmos(roi) {
 
   return roiEmo.repeat(repeatTimes);
 }
+
+getAlertVolume();

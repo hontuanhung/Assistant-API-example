@@ -1,7 +1,7 @@
 // import the required dependencies
 require("dotenv").config();
 const OpenAI = require("openai");
-import { getAlertVolume } from "./orders/orders.js";
+const getAlert = require("./orders/orders");
 
 const readline = require("readline").createInterface({
   input: process.stdin,
@@ -9,7 +9,7 @@ const readline = require("readline").createInterface({
 });
 
 // Create a OpenAI connection
-const secretKey = "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";
+const secretKey = "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";
 const openai = new OpenAI({
   apiKey: secretKey,
 });
@@ -92,31 +92,42 @@ async function main() {
 
       // Polling mechanism to see if runStatus is completed
       // This should be made more robust.
-      if (runStatus.status === "requires_action") {
-        const agrs =
-          runStatus.required_action.submit_tool_outputs.tool_calls[0].function
-            .arguments;
-        const stringOfVolume = getAlertVolume(
-          agrs.volume,
-          agrs.date,
-          agrs.limit
-        );
-        for (const ms of stringOfVolume) {
-          await openai.beta.threads.messages.create(thread.id, {
-            role: "user",
-            content: {
-              tool_call_id: toolCall.id,
-              role: "tool",
-              name: functionName,
-              content: functionResponse,
-            },
-          });
-        }
+      while (runStatus.status === "in_progress") {
+        runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
       }
 
       while (runStatus.status !== "completed") {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
+        console.log(runStatus.status);
+        if (runStatus.status === "failed") {
+          break;
+        }
+        if (runStatus.status === "requires_action") {
+          const agrs = JSON.parse(
+            runStatus.required_action.submit_tool_outputs.tool_calls[0].function
+              .arguments
+          );
+          const stringOfVolume = await getAlert(agrs.volume, agrs.date, agrs.limit);
+          if (!stringOfVolume.length) {
+            await openai.beta.threads.messages.create(thread.id, {
+              role: "user",
+              content: "response: 'There is no order has found'",
+            });
+            break
+          }
+          for (const ms of stringOfVolume) {
+            await openai.beta.threads.runs.submitToolOutputs(
+              thread.id,
+              run.id,
+              {
+                role: "user",
+                content: {
+                  tool_call_id: toolCall.id,
+                  output: ms,
+                },
+              }
+            );
+          }
+        }
       }
 
       // Get the last assistant message from the messages array
